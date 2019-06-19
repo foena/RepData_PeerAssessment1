@@ -1,25 +1,168 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Week 2 Assignment"
+author: "Mike"
+date: "19 Juni 2019"
+output: html_document
 ---
 
+This is an R Markdown document to show the solution as well as the results of the assignment from week 2.
 
-## Loading and preprocessing the data
+###Do some cleaning and package loading stuff and load the necessary data set
+
+```{r, message = FALSE, warning=FALSE}
+rm(list=ls())
+library("dplyr")
+library("ggplot2")
+library("Hmisc")
+setwd("C:/User/Reproducible-Research")
+activity <- read.csv2("activity.csv",sep=",")
+head(activity)
+```
+
+###Date transformation
+
+```{r}
+activity$date <- as.Date(activity$date)
+
+```
+
+##Question 1: What is mean total number of steps taken per day?
+Missing values (NAN´s) will be ignored. The task is divided into 3 different steps:
+
+### Calculate the total number of steps taken per day
+
+```{r}
+total_steps_per_day <- activity %>% select(steps, date, interval) %>% group_by(date) %>% 
+                       summarise(total_steps = sum(steps))
+head(total_steps_per_day)
+```
+
+### Make a histogram of the total number of steps taken each day
+
+```{r,warning=FALSE}
+qplot(total_steps_per_day$total_steps, geom="histogram", binwidth = 1060, xlab = "Total steps per day", 
+      ylab="Frequency", fill=I("blue"), col=I("black"), alpha=I(.2))
+```
+
+### Calculate and report the mean and median of the total number of steps per day
+
+```{r,warning=FALSE}
+mean(na.omit(total_steps_per_day$total_steps))
+```
+
+```{r,warning=FALSE}
+median(na.omit(total_steps_per_day$total_steps))
+```
+
+##Question 2: What is the average daily activity pattern?
+The task is divided into 2 different steps:
+
+### Time series plot of the interval and average number of steps, averaged across days
+
+```{r,warning=FALSE}
+average_steps_per_interval <- (na.omit(activity)) %>% select(steps, date, interval) %>% group_by(interval) %>%
+                               summarise(mean_steps = mean(steps))
+head(average_steps_per_interval)
+```
+
+```{r,warning=FALSE}
+ggplot(data=average_steps_per_interval, aes(x=interval, y=mean_steps)) + geom_line( col="blue") +
+    xlab("5-minute interval") + ylab("average number of steps") 
+```
+
+### Which 5-minute interval contains the maximum number of steps?
+
+```{r}
+maximum <- average_steps_per_interval[which(average_steps_per_interval$mean_steps == max(average_steps_per_interval$mean_steps)), ]
+maximum_interval <- maximum$interval
+print(maximum_interval)
+maximum_steps <- maximum$mean_steps
+print(maximum_steps)
+```
+
+##Task 3: Imputing missing values
+The task is divided into 7 different steps:
+
+### Calculate and report the total number of missing values in the dataset
+
+```{r}
+missing_values_steps <- sum(is.na(as.character(activity$steps)))
+print(missing_values_steps)
+missing_values_date <- sum(is.na(as.character(activity$date)))
+print(missing_values_date)
+missing_values_interval <- sum(is.na(as.character(activity$interval)))
+print(missing_values_interval)
+missing_values_sum <- missing_values_steps + missing_values_date + missing_values_interval
+print(missing_values_sum)
+```
+
+### Devise a strategy for filling in all of the missing values in the dataset
+
+Since there is no further information, the missing values of "steps"" are replaced by the the mean value of all existing step data. This can be done relatively easily with the function "impute".
+
+### Create a new dataset equal to the original one but with the missing data filled in.
+
+```{r}
+activity_without_nan <- activity
+activity_without_nan$steps <- impute(activity_without_nan$steps,fun=mean)
+head(activity_without_nan)
+```
+
+### Make a histogram of the total number of steps taken each day 
+
+```{r}
+total_steps_per_day_without_nan <- activity_without_nan %>% select(steps, date, interval) %>% group_by(date) %>%  summarise(total_steps = sum(steps))
+```
 
 
+```{r,warning=FALSE}
+qplot(total_steps_per_day_without_nan$total_steps, geom="histogram", binwidth = 1060, xlab = "Total steps per day",  ylab="Frequency", fill=I("red"), col=I("black"), alpha=I(.2))
+```
 
-## What is mean total number of steps taken per day?
+### Calculate and report the mean and median total number of steps taken per day. 
 
+```{r,warning=FALSE}
+mean_total_steps_without_na <- mean(total_steps_per_day_without_nan$total_steps)
+print(mean_total_steps_without_na)
+median_total_steps_without_na <- median(total_steps_per_day_without_nan$total_steps)
+print(median_total_steps_without_na)
+```
 
+### Do these values differ from the estimates from the first part of the assignment?
 
-## What is the average daily activity pattern?
+```{r,warning=FALSE}
+mean_before_imputing <-  mean(na.omit(total_steps_per_day$total_steps))
+print(mean_before_imputing)
+mean_after_imputing <-  mean(total_steps_per_day_without_nan$total_steps)
+print(mean_after_imputing)
+median_before_imputing <-  median(na.omit(total_steps_per_day$total_steps))
+print(median_before_imputing)
+median_after_imputing <-  median(total_steps_per_day_without_nan$total_steps)
+print(median_after_imputing)
+```
 
+### What is the impact of imputing missing data on the estimates of the total daily number of steps?
 
+The mean value is completly identical. The median value shows slight differences.
 
-## Imputing missing values
+## Question 4: Are there differences in activity patterns between weekdays and weekends?
+The task is divided into 2 different steps:
 
+### Create a new factor variable in the dataset with two levels – “weekday” and “weekend” 
 
+```{r,warning=FALSE}
+activity_without_nan$days <- weekdays(activity_without_nan$date)
+activity_without_nan$week <- ""
+activity_without_nan[activity_without_nan$days == "Samstag" | activity_without_nan$days == "Sonntag", ]$week <- "weekend"
+activity_without_nan[!(activity_without_nan$days == "Samstag" | activity_without_nan$days == "Sonntag"), ]$week <- "weekday"
+activity_without_nan <- (activity_without_nan) %>% select(steps, date, interval,days,week) %>% group_by(week, interval) %>% summarise(mean_steps = mean(steps))
+print(activity_without_nan)
+```
+### Make a panel plot containing a time series plot 
 
-## Are there differences in activity patterns between weekdays and weekends?
+```{r,warning=FALSE}
+qplot(interval,mean_steps,data=activity_without_nan) + geom_line() + facet_wrap(.~week,  ncol=1) +
+xlab("5-minute interval") +
+ylab("Average number of steps")
+```
+
